@@ -24,7 +24,7 @@ class LazySettings(object):
 
     def __delattr__(self, name):
         if name.startswith('_'):
-            return super(LazySettings, self).__delattr__(name)
+            return self._safe_super_method('__delattr__', name)
 
         if hasattr(django_settings, name):
             delattr(django_settings, name)
@@ -40,7 +40,7 @@ class LazySettings(object):
         available setting from configuration definition file if any.
         """
         if name.startswith('_'):
-            return super(LazySettings, self).__getattr__(name)
+            return self._safe_super_method('__getattr__', name)
 
         data, prefix = self._custom.data, self._prefix
 
@@ -70,7 +70,7 @@ class LazySettings(object):
         Add support of setting values to settings as instance attribute.
         """
         if name.startswith('_'):
-            return super(LazySettings, self).__setattr__(name, value)
+            return self._safe_super_method('__setattr__', name, value)
 
         # First of all try to setup value to Django setting
         if hasattr(django_settings, name):
@@ -108,6 +108,9 @@ class LazySettings(object):
 
     @property
     def _custom(self):
+        """
+        Read custom settings from database and store it to the instance cache.
+        """
         if self._parent:
             return self._parent._custom
 
@@ -124,3 +127,21 @@ class LazySettings(object):
             return Settings.objects.get()
         except Settings.DoesNotExist:
             return Settings.objects.create(data={})
+
+    def _safe_super_method(self, method, *args, **kwargs):
+        """
+        Execute super ``method`` and format fancy error message on
+        ``AttributeError``.
+        """
+        klass = self.__class__
+
+        try:
+            method = getattr(super(klass, self), method)
+        except AttributeError:
+            args = (
+                klass.__name__,
+                args[0] if method.endswith('attr__') else method
+            )
+            raise AttributeError('%r object has no attribute %r' % args)
+        else:
+            return method(*args, **kwargs)
