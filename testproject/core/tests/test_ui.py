@@ -2,6 +2,7 @@ import copy
 
 from decimal import Decimal
 
+from django import VERSION
 from django.conf import settings as django_settings
 from django.contrib.auth.models import User
 from django.core.urlresolvers import reverse
@@ -142,7 +143,13 @@ class TestAdminUI(TestCase):
         self.edit_url = reverse('admin:setman_settings_changelist')
 
     def test_admin(self):
-        relative = lambda url: url.replace(self.admin_url, '')
+        if VERSION[:2] == (1, 3):
+            relative = lambda url: url.replace(self.admin_url, '')
+            add_url = relative(self.add_url)
+            edit_url = relative(self.edit_url)
+        else:
+            add_url = self.add_url
+            edit_url = self.edit_url
 
         response = self.client.get(self.admin_url)
         self.assertNotContains(response, 'Settings Manager')
@@ -153,16 +160,14 @@ class TestAdminUI(TestCase):
 
         self.assertContains(response, 'Settings Manager')
         self.assertContains(
-            response, '<a href="%s">Settings</a>' % relative(self.edit_url)
+            response, '<a href="%s">Settings</a>' % edit_url
         )
         self.assertNotContains(
-            response, '<a href="%s" class="addlink">Add</a>' % \
-            relative(self.add_url)
+            response, '<a href="%s" class="addlink">Add</a>' % add_url
         )
         self.assertContains(
             response,
-            '<a href="%s" class="changelink">Change</a>' % \
-            relative(self.edit_url)
+            '<a href="%s" class="changelink">Change</a>' % edit_url
         )
 
     def test_admin_edit(self):
