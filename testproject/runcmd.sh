@@ -16,8 +16,9 @@ do
         continue
     fi
 
-    echo "Virtual environment: `basename $dir`"
-    echo "Django command: $cmd"
+    echo "Working environment is '`basename $dir`'"
+    echo "Django command is '$cmd'"
+    echo
 
     source "$dir/bin/activate"
     python "$DIRNAME/manage.py" $cmd
