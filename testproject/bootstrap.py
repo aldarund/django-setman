@@ -1,114 +1,212 @@
 #!/usr/bin/env python
 """
-Bootstrap script for prepare environ for project
+Bootstrap project using virtualenv_ and pip_. This script will create new
+virtual environment if needed and will install all requirements there.
+
+.. _virtualenv: http://pypi.python.org/pypi/virtualenv
+.. _pip: http://pypi.python.org/pypi/pip
+
 """
 
+import ConfigParser
+import copy
 import os
-import subprocess
-import optparse
+import re
 import sys
 
-DEFAULT_PRE_REQS = ['virtualenv']
 
-def _warn(msg):
-    sys.stderr.write("Warn: %s\n" % (msg,))
-
-def _err(msg):
-    sys.stderr.write("Error: %s\n" % (msg,))
+try:
+    import pip
+except ImportError, e:
+    print('ERROR: %s') % e
+    print('ERROR: This script requires pip installed in your system.')
     sys.exit(1)
 
-def get_pre_reqs(pre_req_txt):
-    """Getting list of pre-requirement executables"""
-    try:
-        pre_reqs = open(pre_req_txt).readlines()
-    except IOError:
-        _warn("Couldn't find pre-reqs file: %s, use default pre-reqs" % pre_req_txt)
-        # There are no pre-reqs yet.
-        pre_reqs = DEFAULT_PRE_REQS
-    for pre_req in pre_reqs:
-        pre_req = pre_req.strip()
-        # Skip empty lines and comments
-        if not pre_req or pre_req.startswith('#'):
+
+try:
+    import virtualenv
+except ImportError, e:
+    print('ERROR: %s') % e
+    print('ERROR: This script requires virtualenv installed in your system.')
+    sys.exit(1)
+
+
+# Default configuration for bootstrap script. You may override configuration
+# in ``bootstrap.cfg`` file.
+CONFIG = {
+    'pip': {
+        'download_cache': '%(DEST_DIR)s/src',
+        'quiet': False,
+        'upgrade': False,
+        'verbose': False,
+    },
+    'virtualenv': {
+        'clear': False,
+        'dest_dir': 'env',
+        'site_packages': False,
+        'quiet': 0,
+        'unzip_setuptools': True,
+        'verbose': 0,
+    },
+}
+
+# Default requirements file and pattern to match all requirements files
+REQUIREMENTS_FILE = 'requirements.txt'
+REQUIREMENTS_REGEXP = re.compile(r'^requirements(?P<suffix>.*).txt$')
+
+# Convert relative path to absolute
+DIRNAME = os.path.abspath(os.path.dirname(__file__))
+rel = lambda *x: os.path.abspath(os.path.join(DIRNAME, *x))
+
+
+class Environment(object):
+    """
+    Cumulative class to create new virtual environment and install all
+    requirements there.
+    """
+    def __init__(self, suffix=None, filename=None):
+        # Initialize environment
+        self.suffix = suffix is None and self.suffix_from_filename(filename) \
+                                     or suffix
+        print('Working environment is %r' % os.path.basename(self.dest_dir))
+
+    def create(self):
+        # Create new virtual environment
+        print('\nStep 1. Create new virtual environment')
+
+        if not os.path.isdir(self.dest_dir) or CONFIG['virtualenv']['clear']:
+            kwargs = copy.copy(CONFIG['virtualenv'])
+            kwargs['home_dir'] = self.dest_dir
+
+            verbosity = int(kwargs['verbose']) - int(kwargs['quiet'])
+            logger = virtualenv.Logger([
+                (virtualenv.Logger.level_for_integer(2 - verbosity),
+                 sys.stdout),
+            ])
+
+            del kwargs['dest_dir'], kwargs['quiet'], kwargs['verbose']
+
+            virtualenv.logger = logger
+            virtualenv.create_environment(**kwargs)
+        else:
+            print('Virtual environment %r already exists.' % self.dest_dir)
+
+    @property
+    def dest_dir(self):
+        if not hasattr(self, '_dest_dir'):
+            dest_dir = CONFIG['virtualenv']['dest_dir']
+            if self.suffix:
+                dest_dir += self.suffix
+            setattr(self, '_dest_dir', rel(dest_dir))
+        return getattr(self, '_dest_dir')
+
+    def install_requirements(self):
+        print('\nStep 2. Install requirements')
+
+        # Install requirements from necessary requirements file
+        if os.path.isfile(self.requirements_file):
+            args = ['install',
+                    '-E', os.path.basename(self.dest_dir),
+                    '-r', os.path.basename(self.requirements_file)]
+
+            if CONFIG['pip']['download_cache']:
+                download_cache = \
+                    CONFIG['pip']['download_cache'] % self.template_context
+                args.extend(['--download-cache', download_cache])
+
+            for name in ('quiet', 'upgrade', 'verbose'):
+                if CONFIG['pip'][name]:
+                    args.append('--' + name)
+
+            try:
+                pip.main(args)
+            except SystemExit, e:
+                if e.code:
+                    raise e
+        else:
+            print('ERROR: Cannot to find requirements file at %r.' % \
+                  self.requirements_file)
+            sys.exit(1)
+
+    @property
+    def requirements_file(self):
+        if not hasattr(self, '_requirements_file'):
+            requirements_file, ext = os.path.splitext(REQUIREMENTS_FILE)
+            if self.suffix:
+                requirements_file += self.suffix
+            requirements_file += ext
+            setattr(self, '_requirements_file', rel(requirements_file))
+        return getattr(self, '_requirements_file')
+
+    def suffix_from_filename(self, filename):
+        if filename is None:
+            return u''
+        try:
+            return REQUIREMENTS_REGEXP.findall(filename)[0]
+        except IndexError:
+            print('Cannot init new environment using %r filename.' % filename)
+            sys.exit(1)
+
+    @property
+    def template_context(self):
+        return {'DEST_DIR': self.dest_dir}
+
+
+def main():
+    """
+    Create new virtual environments and install pip requirements there.
+    """
+    # Change directory to current
+    os.chdir(DIRNAME)
+
+    # Read configuration values from ``bootstrap.cfg`` file if possible
+    read_config('bootstrap.cfg')
+
+    # Search over current directory files
+    filenames = sorted(os.listdir(DIRNAME))
+    env = None
+
+    for filename in filenames:
+        if not REQUIREMENTS_REGEXP.match(filename):
             continue
-        yield pre_req
 
-def check_pre_req(pre_req):
-    """Check for pre-requirement"""
-    if subprocess.call(['which', pre_req],
-                       stderr=subprocess.PIPE, stdout=subprocess.PIPE) == 1:
-        _err("Couldn't find '%s' in PATH" % pre_req)
+        if env is not None:
+            print('\n%s\n') % ('-' * 79)
 
-def provide_virtualenv(ve_target, no_site=True):
-    """Provide virtualenv"""
-    args = ['--distribute']
-    if no_site:
-        args.append('--no-site')
-    if not os.path.exists(ve_target):
-        subprocess.call(['virtualenv'] + args + [ve_target])
+        # Initialize environment
+        env = Environment(filename=filename)
 
-def install_pip_requirements(ve_target, upgrade=False):
-    """Install required Python packages into virtualenv"""
-    pip_path = os.path.join(ve_target, 'bin', 'pip')
-    call_args = [pip_path, 'install', '-r', 'requirements.txt']
-    if upgrade:
-        call_args.append('--upgrade')
-    if subprocess.call(call_args):
-        _err("Failed to install requirements")
+        # Try to create new virtual environment
+        env.create()
 
-def pass_control_to_doit(ve_target):
-    """Passing further control to doit"""
-    try:
-        import dodo
-    except ImportError:
+        # Install all requirements to this virtual environment if possible
+        env.install_requirements()
+
+
+def read_config(config_file):
+    global CONFIG
+
+    if not config_file.startswith(DIRNAME):
+        config_file = rel(config_file)
+
+    if not os.path.isfile(config_file):
         return
 
-    if hasattr(dodo, 'task_bootstrap'):
-        doit = os.path.join(ve_target, 'bin', 'doit')
-        subprocess.call([doit, 'bootstrap'])
+    config = ConfigParser.ConfigParser()
+    config.read(config_file)
 
-def do(func, *args, **kwargs):
-    """Announce func.__doc__ and run func with provided arguments"""
-    doc = getattr(func, '__doc__')
-    if doc is None:
-        doc = func.__name__
-    func_args = ', '.join(str(a) for a in args)
-    func_kwargs = ', '.join("%s=%s" % (k, str(v))
-                            for k, v in kwargs.iteritems())
-    msg = "%s... %s %s\n" % (doc, func_args, func_kwargs)
-    sys.stderr.write(msg)
-    return func(*args, **kwargs)
+    print('Load bootstrap configuration from %r.' % config_file)
 
+    for section in ('pip', 'virtualenv'):
+        try:
+            items = config.items(section)
+        except ConfigParser.NoSectionError:
+            continue
 
-def bootstrap(pre_req_txt, ve_target, no_site=True, upgrade=False):
-    ve_target = os.path.normpath(os.path.abspath(ve_target))
-    os.environ['BOOTSTRAP_VIRTUALENV_TARGET'] = ve_target
-    for pre_req in do(get_pre_reqs, pre_req_txt):
-        do(check_pre_req, pre_req)
-    do(provide_virtualenv, ve_target, no_site=no_site)
-    do(install_pip_requirements, ve_target, upgrade=upgrade)
-    do(pass_control_to_doit, ve_target)
+        for key, value in items:
+            if key in CONFIG[section]:
+                CONFIG[section][key] = value
 
-def main(args):
-    parser = optparse.OptionParser()
-    parser.add_option("-p", "--pre-requirements", dest="pre_requirements",
-                      default="pre-reqs.txt", action="store", type="string",
-                      help="File with list of pre-reqs")
-    parser.add_option("-E", "--virtualenv", dest="virtualenv",
-                      default='ve', action="store", type="string",
-                      help="Path to virtualenv to use")
-    parser.add_option("-s", "--no-site", dest="no_site",
-                      default=False, action="store_true",
-                      help="Don't use global site-packages on create virtualenv")
-    parser.add_option("-u", "--upgrade", dest="upgrade",
-                      default=False, action="store_true",
-                      help="Upgrade packages")
-    options, args = parser.parse_args(args)
-    bootstrap(
-        options.pre_requirements,
-        options.virtualenv,
-        options.no_site,
-        options.upgrade)
 
 if __name__ == '__main__':
-    main(sys.argv)
-
+    main()
