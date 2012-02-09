@@ -182,6 +182,24 @@ def main():
         # Install all requirements to this virtual environment if possible
         env.install_requirements()
 
+    # Activate default virtual environment if possible and run
+    # ``doit bootstrap`` command
+    try:
+        activate_this = rel('env', 'bin', 'activate_this.py')
+        execfile(activate_this, {'__file__': activate_this})
+
+        try:
+            from doit import doit_cmd
+        except ImportError:
+            pass
+        else:
+            print('\n%s\n') % ('-' * 79)
+            print('Passing control to doit...\n')
+
+            doit_cmd.cmd_main(['-f', rel('dodo.py'), 'bootstrap'])
+    except:
+        pass
+
 
 def read_config(config_file):
     global CONFIG

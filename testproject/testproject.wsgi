@@ -2,13 +2,13 @@ import os
 import sys
 
 
-PROJECT_DIR = '/srv/django-setman'
-VIRTUALENV_DIR = 'testproject/ve'
+DIRNAME = os.path.abspath(os.path.dirname(__file__))
+rel = lambda *x: os.path.abspath(os.path.join(DIRNAME, *x))
 
-activate_this = \
-    os.path.join(PROJECT_DIR, VIRTUALENV_DIR, 'bin', 'activate_this.py')
+PROJECT_DIR = rel('..')
+activate_this = rel('env', 'bin', 'activate_this.py')
 
-# activate virtualenv
+# Activate virtualenv
 execfile(activate_this, {'__file__': activate_this})
 
 os.environ['DJANGO_SETTINGS_MODULE'] = 'settings'
