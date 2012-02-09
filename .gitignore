@@ -10,4 +10,5 @@ docs/_build/
 dist/
 reports/
 testproject/local_settings.py
+testproject/env*/
 testproject/ve/
