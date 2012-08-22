@@ -1,14 +1,15 @@
 *.pyc
 *.pyo
 
+docs/_build/
+dist/
+reports/
+testproject/env*/
+testproject/ve*/
+
 .doit.db
 .doit.db.db
 MANIFEST
 sqlite3.db
 
-docs/_build/
-dist/
-reports/
 testproject/local_settings.py
-testproject/env*/
-testproject/ve/
