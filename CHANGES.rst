@@ -5,7 +5,11 @@ django-setman Changes
 0.3 (current)
 -------------
 
-- ...
++ Refactor bootstrapping of test project.
++ Checked support of Django 1.4.
++ Show error message in UI if table for ``Settings`` model is not created in
+  database.
++ Add verbose on ``AttributeErrors`` in ``LazySettings`` class.
 
 0.2
 ---

@@ -9,7 +9,7 @@ except ImportError:
 __all__ = ('get_version', 'settings')
 
 
-VERSION = (0, 2)
+VERSION = (0, 3, 'pre')
 settings = LazySettings()
 
 
