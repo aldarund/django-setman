@@ -2,14 +2,22 @@ from django.conf import settings
 from django.conf.urls.defaults import include, patterns
 from django.contrib import admin
 from django.contrib.auth.decorators import login_required
-from django.views.generic.simple import direct_to_template
+
+try:
+    from django.views.generic.simple import direct_to_template
+except ImportError:
+    from django.views.generic import TemplateView
+    home_view = TemplateView.as_view(template_name='home.html')
+    home_data = {}
+else:
+    home_view = direct_to_template
+    home_data = {'template': 'home.html'}
 
 
 admin.autodiscover()
 
 urlpatterns = patterns('',
-    (r'^$', login_required(direct_to_template), {'template': 'home.html'},
-     'home'),
+    (r'^$', login_required(home_view), home_data, 'home'),
 
     (r'^odesk_auth/', include('django_odesk.auth.urls')),
 
