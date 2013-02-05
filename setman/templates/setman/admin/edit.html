@@ -1,10 +1,10 @@
 {% extends "admin/base_site.html" %}
-{% load i18n admin_modify adminmedia %}
+{% load i18n admin_modify  %}
 
-{% block extrastyle %}{{ block.super }}<link rel="stylesheet" type="text/css" href="{% admin_media_prefix %}css/forms.css" />{% endblock %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" type="text/css" href="{{ STATIC_URL }}admin/css/forms.css" />{% endblock %}
 {% block extrahead %}
     {{ block.super }}
-    <script src="{% admin_media_prefix %}js/jquery.min.js" type="text/javascript"></script>
+    <script src="{{ STATIC_URL }}admin/js/jquery.min.js" type="text/javascript"></script>
     <script type="text/javascript"><!--
         $(document).ready(function() {
             $("fieldset").each(function(i) {
@@ -61,7 +61,7 @@
 
         <div class="submit-row">
             <input class="default" type="submit" value="{{ _("Save") }}" />
-            <p class="deletelink-box"><a href="{% url admin:setman_settings_revert %}?next={% url admin:setman_settings_changelist %}" title="{{ _("Revert all settings to default values") }}">{{ _("Revert") }}</a></p>
+            <p class="deletelink-box"><a href="{% url 'admin:setman_settings_revert' %}?next={% url 'admin:setman_settings_changelist' %}" title="{{ _("Revert all settings to default values") }}">{{ _("Revert") }}</a></p>
         </div>
     </form>
     {% endif %}

@@ -2,7 +2,11 @@ from django.conf import settings as django_settings
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.utils import simplejson
+try:
+    import json as simplejson
+except ImportError:
+    from django.utils import simplejson
+
 
 from setman.utils import AVAILABLE_SETTINGS, is_settings_container
 

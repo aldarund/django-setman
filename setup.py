@@ -11,12 +11,11 @@ readme = open(os.path.join(DIRNAME, 'README.rst'), 'r')
 README = readme.read()
 readme.close()
 
-version = __import__('setman').get_version()
 
 
 setup(
     name='django-setman',
-    version=version,
+    version="0.3",
     description='Django settings manager. Another.',
     long_description=README,
     author='Igor Davydenko',
